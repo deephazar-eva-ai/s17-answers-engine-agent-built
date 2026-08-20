@@ -1806,3 +1806,82 @@ evidence — real transcripts captured during the build, not something the
 live `/answers` page displays or was ever asked to display — and that
 distinction was stated plainly rather than blurred, so nobody reading the
 README mistakes documented build evidence for a live feature of the page.
+
+---
+
+## 34. Submission — the product repo, and two independent bug-fix PRs
+
+**The product repository.** `agent-rebuild-workspace` was committed (one
+commit, 14 files, the full product layer plus both documentation files) and
+pushed to a new public repository: `https://github.com/deephazar-eva-ai/
+s17-answers-engine-agent-built`. Getting the push through surfaced a real,
+unrelated lesson about GitHub's own permission model, not a bug in
+anything built here: the account's `gh` authentication used a fine-grained
+personal access token, and fine-grained tokens fail differently at each
+layer they touch — `createRepository` needs account-level repository-
+creation permission, pushing to an existing repo needs `Contents: Read and
+write` scoped to that specific repository, and pushing any file under
+`.github/workflows/` needs the separate `workflow` scope on top of both,
+because GitHub treats workflow-file writes as their own privileged
+operation regardless of general content-write access. Each block was
+diagnosed from its exact GraphQL/HTTP error text rather than guessed at,
+fixed one permission at a time, and the push succeeded on the third
+attempt once all three were granted.
+
+**Part 2 — a pull request against `glc_v5` or `S17Code`.** Two real,
+already-fixed, already-tested bugs were found to already exist as pushed
+branches, independent of anything built in this document's own thread:
+
+- **`S17Code` — `fix/protected-paths-env-example`**
+  ([theschoolofai/S17Code#22](https://github.com/theschoolofai/S17Code/pull/22)):
+  `S17_PROTECTED_PATHS` *replaces* `guard.py`'s `DEFAULT_PROTECTED` outright
+  rather than adding to it, but the value shipped in `.env.example` was
+  narrower than that default — missing `test/**`, `**/tests/**`,
+  `**/test_*.py`, `**/*_test.py`, `**/conftest.py`, `tox.ini`, `setup.cfg`.
+  The README's own setup step, `cp .env.example .env`, therefore leaves a
+  fresh checkout *less* protected than the code's own hardcoded default,
+  silently, with no warning — the one guard meant to stop the coding agent
+  from editing the tests that grade it, weakened by following the setup
+  instructions exactly as written. A second, related leak in the same fix:
+  `s17code.main`'s module-level `load_dotenv()` writes straight to
+  `os.environ` (a real env write, not a `monkeypatch.setenv`), so it
+  survives fixture teardown and silently narrows `S17_PROTECTED_PATHS` for
+  every test running afterward in the same process. Fixed with the correct
+  `.env.example` value, an explicit `monkeypatch.delenv` in `conftest.py`'s
+  isolation fixture, and a new regression test that parses the *actual*
+  `.env.example` file and asserts it protects everything the hardcoded
+  default protects — so this specific regression can't reoccur silently
+  again.
+- **`glc_v5` — `fix/case-sensitive-email-pairing`**
+  ([theschoolofai/glc_v5#39](https://github.com/theschoolofai/glc_v5/pull/39)):
+  email-channel identity comparisons (`glc/security/pairing.py`) were
+  case-sensitive, but Gmail/IMAP adapters extract the bare address straight
+  off the `From:` header with no lowercasing, and real mail clients/MTAs
+  are not consistent about local-part case for the same real inbox. A real
+  owner paired once as `Owner@Gmail.com` could be silently reclassified as
+  untrusted the moment a later message arrived as `owner@gmail.com` — a
+  genuine trust-boundary defect, not a cosmetic one. Fixed with a single
+  `_normalize_id` helper applied consistently at every read and write path
+  (`issue_code`, `lookup`, `revoke`, `force_pair_owner`), plus three new
+  regression tests covering pairing, the code-confirmation flow, and
+  revocation, all under mixed case.
+
+Both were verified before being called done, the same discipline as every
+other claim in this document: fetched fresh, confirmed still cleanly based
+on their respective `main` with no rebase needed, and — once actually
+opened — read back via `gh pr view` to confirm real, open PRs with file and
+line-change counts matching the diffs already reviewed (`S17Code`#22: 3
+files, +39/−1; `glc_v5`#39: 2 files, +53/−2), not just trusted because a
+link was shared.
+
+**What this session's own contribution to these two was, precisely:**
+discovery that the branches already existed with complete, tested fixes;
+independent verification of both diffs and their currency against `main`;
+and repeated attempts to open the PRs programmatically via `gh pr create`,
+each one blocked by the same class of fine-grained-PAT permission gap as
+the product-repo push (this time `Pull requests: Read and write`,
+diagnosed from the identical `GraphQL: Resource not accessible by personal
+access token` error shape). The PRs were ultimately opened directly by the
+account holder through the browser once the programmatic path stayed
+blocked — the fastest correct path once a token limitation, not a code
+defect, was the actual obstacle.

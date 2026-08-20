@@ -375,3 +375,25 @@ The underlying S17Code engine's own architecture and design — the live
 graph, the capability registry, memory, A2A, the autonomy layer — is
 documented separately in [`docs/ENGINE.md`](docs/ENGINE.md), unchanged from
 the platform this product was built on top of.
+
+---
+
+## 8. Submission links
+
+- **Part 1 — the product**: this repository.
+  `https://github.com/deephazar-eva-ai/s17-answers-engine-agent-built`
+- **Part 2 — a real bug fix, as a pull request against `S17Code` or
+  `glc_v5`**: two, both independent of this product build, both real,
+  both tested:
+  - [`theschoolofai/S17Code#22`](https://github.com/theschoolofai/S17Code/pull/22)
+    — the shipped `.env.example`'s `S17_PROTECTED_PATHS` silently weakened
+    the coding guard below its own hardcoded default, so the README's own
+    `cp .env.example .env` setup step left a fresh checkout less protected
+    than the code intended, with no warning.
+  - [`theschoolofai/glc_v5#39`](https://github.com/theschoolofai/glc_v5/pull/39)
+    — email-channel pairing was case-sensitive; a real paired owner could
+    be silently reclassified as untrusted by a later message arriving in
+    different letter case than the address they first paired with.
+
+Full detail on both, including verification, is in `docs/myowncodeworking.md`
+§34.
