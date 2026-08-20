@@ -12,8 +12,7 @@ from __future__ import annotations
 
 import json
 
-from s17code.runtime import _as_section, _parse_json_array
-
+from s17code.workers.parsing import _as_section, _parse_json_array
 
 QUESTIONS = [
     {"id": "Q1", "stem": "A solid sphere rolls without slipping. Its acceleration is:",

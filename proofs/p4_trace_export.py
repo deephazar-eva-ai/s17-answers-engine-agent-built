@@ -64,7 +64,11 @@ from s17code.telemetry.spans import (
 )
 
 REQUIRED_GENAI = (GEN_AI_PROVIDER, GEN_AI_REQUEST_MODEL, GEN_AI_INPUT_TOKENS, GEN_AI_OUTPUT_TOKENS)
-EXPECTED_PARENT = {"agent_loop": "run", "plan": "agent_loop", "node": "agent_loop", "provider_call": "node"}
+#: A provider call is metered wherever it is made: the planner's own decision
+#: and evidence-readiness calls live under "plan", a worker's calls live under
+#: the "node" it ran inside.
+EXPECTED_PARENT = {"agent_loop": ("run",), "plan": ("agent_loop",), "node": ("agent_loop",),
+                   "provider_call": ("plan", "node")}
 
 #: Attribute-name fragments that would mean prompt or completion text escaped into
 #: the backend. Checked as substrings so a renamed convention cannot slip past.
@@ -135,7 +139,7 @@ def backend_hierarchy(trace: dict) -> tuple[dict[str, int], list, list]:
             continue
         parent = parent_of(span)
         got = str(tags.get(parent, {}).get("s15.span.kind")) if parent else None
-        if got != expected:
+        if got not in expected:
             wrong.append((span["operationName"], kind, got))
     leaks = sorted(
         {key for attrs in tags.values() for key in attrs if any(m in key for m in CONTENT_MARKERS)}
@@ -181,7 +185,7 @@ def run(args: Args) -> Proof:
         if expected is None:
             continue
         parent = by_id.get(span["parent_span_id"] or "")
-        if not parent or parent["kind"] != expected:
+        if not parent or parent["kind"] not in expected:
             wrong_parents.append((span["name"], span["kind"], parent["kind"] if parent else None))
     proof.check("run -> agent loop -> plan -> node -> provider call",
                 not wrong_parents, wrong_parents or "every parent is the expected kind")

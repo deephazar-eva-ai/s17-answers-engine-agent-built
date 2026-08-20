@@ -122,6 +122,15 @@ class OfflineTransport:
     scale with the prompt it was handed, and output respects the ``max_tokens``
     the tier asked for. Everything above it — policy, ladder, budget, journal,
     spans — is the real implementation.
+
+    The one place this cannot stay task-blind is the planner's own protocol: the
+    live-graph planner requires a JSON object shaped like its output schema, and
+    the evidence-readiness critic requires ``ready``/``missing``. Answer with the
+    smallest valid reply for those two roles — one direct ``answer_with_evidence``
+    node, accepted on review — so an offline run still produces a real node and
+    provider-call span rather than exhausting the planner's repair attempts on
+    unparseable text. Every other role (workers, the final synthesis) is still
+    answered with the same task-blind digest as before.
     """
 
     def __init__(self, *, wanted_output: int = 4000, latency_ms: float = 8.0) -> None:
@@ -131,9 +140,9 @@ class OfflineTransport:
         request = dict(request or {})
         ceiling = int(request.get("max_tokens") or self.wanted_output)
         digest = hashlib.sha256((prompt + system).encode()).hexdigest()[:12]
+        text = self._planner_reply(prompt, system, digest)
         return {
-            "text": json.dumps({"offline": True, "digest": digest,
-                                "note": "deterministic offline transport; no provider was called"}),
+            "text": text,
             "provider": "offline_1",
             "model": request.get("model", "offline-model"),
             "input_tokens": len(prompt) // 4 + len(system) // 4,
@@ -142,6 +151,24 @@ class OfflineTransport:
             "cache_creation_input_tokens": 0,
             "latency_ms": self.latency_ms,
         }
+
+    @staticmethod
+    def _planner_reply(prompt: str, system: str, digest: str) -> str:
+        if "evidence-readiness critic" in system:
+            return json.dumps({"ready": True, "missing": [],
+                               "reason": "offline transport: evidence accepted"})
+        if "decision core of a live-graph agent" in system:
+            context = json.loads(prompt)
+            if "answer" in {node["id"] for node in context["graph"]["nodes"]}:
+                return json.dumps({"add": [], "cancel": [], "finish": True,
+                                   "reason": "offline transport: answer complete"})
+            return json.dumps({
+                "add": [{"id": "answer", "capability": "answer_with_evidence",
+                         "arguments": {"query": context["goal"]}, "depends_on": []}],
+                "cancel": [], "finish": False, "reason": "offline transport: answer directly",
+            })
+        return json.dumps({"offline": True, "digest": digest,
+                           "note": "deterministic offline transport; no provider was called"})
 
 
 def gateway_reachable(base_url: str, *, timeout: float = 2.0) -> bool:

@@ -21,16 +21,16 @@ import json
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import HTMLResponse, StreamingResponse, Response
+from fastapi.responses import HTMLResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from .agui import run_data_model, state_snapshot, to_agui_event
 from .catalog import catalog_manifest
+from .export import build_docx, build_pptx
+from .export import slug as _slug_question
 from .hitl import PendingAction, decide_resume
 from .surface import build_run_surface
 from .validator import validate_surface
-from .export import build_docx, build_pptx
-from .export import slug as _slug_question
 
 router = APIRouter()
 _CLIENT = Path(__file__).parent / "client" / "index.html"
