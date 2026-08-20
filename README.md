@@ -397,3 +397,72 @@ the platform this product was built on top of.
 
 Full detail on both, including verification, is in `docs/myowncodeworking.md`
 §34.
+
+---
+
+## 9. CI, green for the first time
+
+This repository's `ci` workflow (`uv run ruff check .` → `pytest` → the three
+offline economics/trace proofs) had never once passed — both pushes to
+`master` failed at the very first step, `ruff check`, which meant `pytest`
+and the proofs had never actually run in CI at all.
+
+**The lint failure itself**: ~50 accumulated `ruff` violations (unsorted/
+unused imports, one multi-import line, one ambiguous `l` loop variable).
+Cleaning them up was mostly mechanical (`ruff check --fix .`), but two of the
+"unused imports" ruff wanted removed were load-bearing:
+
+- `s17code/workers/special.py` called `os.getenv`/`os.environ` without ever
+  importing `os` — `F821 Undefined name 'os'`, a real `NameError` waiting to
+  happen the first time `run_validate_work` executed.
+- `s17code/workers/general.py`'s `run_retriever` called a bare, undefined
+  `recall(...)` — `F821 Undefined name 'recall'` — instead of delegating to
+  `s17code.workers.special.recall`, the function that actually does the
+  memory lookup. The retriever capability could never have worked.
+
+Removing the *actually*-unused import of those same parsing helpers from
+`s17code/runtime.py` (a leftover from before the worker-extraction refactor)
+broke three tests that had been silently monkeypatching or importing through
+that dead re-export instead of the real module (`s17code.workers.general`,
+`s17code.workers.parsing`) — fixed by pointing them at the real call sites.
+
+**Clearing the lint step exposed two more failures CI had never reached:**
+
+- `proofs/p4_trace_export.py --offline` failed because the offline dummy
+  transport (`proofs/harness.py`'s `OfflineTransport`) returns the same
+  task-blind digest text for every prompt, including the planner's own
+  strict JSON protocol — so the real planner could never parse a valid
+  patch, burned all its repair attempts, and the run finished with zero
+  graph nodes and no `node`-kind trace span. Gave `OfflineTransport` the
+  smallest valid reply for exactly two roles — the planner's decision call
+  and the evidence-readiness critic — so an offline run now produces one
+  real `answer_with_evidence` node. That in turn exposed a genuine bug in
+  the proof's own hierarchy check: `EXPECTED_PARENT` required every
+  `provider_call` span's parent to be `node`, but `s17code/telemetry/
+  spans.py` intentionally parents the planner's *own* metered calls under
+  `plan` (they are provider calls too, made before any node exists).
+  Widened the check to accept either.
+- `tests/test_capability_contracts.py::test_every_registered_capability_
+  has_a_worker_and_every_worker_is_registered` built `AgentRuntime()`
+  directly without swapping in `DeterministicEmbedder` the way every other
+  test in the suite does, so its one `memory.write()` call reached for the
+  real Ollama embedder. That happened to succeed on a machine with Ollama
+  running locally — masking the bug for months — and failed on the CI
+  runner with `urllib.error.URLError: <urlopen error [Errno 111] Connection
+  refused>`. Same fix as everywhere else: pin the embedder before the run.
+
+None of these five bugs were introduced by this rebuild — `git log` shows
+none of the touched files (`s17code/workers/*.py`, `s17code/runtime.py`,
+`proofs/harness.py`, `proofs/p4_trace_export.py`,
+`tests/test_capability_contracts.py`) were edited by either commit on this
+branch; they were latent in the base import, invisible only because CI had
+never gotten far enough to trip over them. Verified locally end-to-end
+(`ruff check .`, full `pytest -q`, all three proofs `--offline`) before
+pushing, then confirmed on the actual runner:
+
+```
+$ gh run list --workflow=ci.yml --limit 3
+success  push  Isolate the capability-contract probe test from the real embedder
+failure  push  Fix ruff lint failures and two bugs they were masking
+failure  push  Document submission links: product repo, and both Part 2 bug-fix PRs
+```
