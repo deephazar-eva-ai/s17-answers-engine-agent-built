@@ -116,6 +116,7 @@ def test_every_registered_capability_has_a_worker_and_every_worker_is_registered
 
     import s17code.runtime as runtime_module
     from s17code.core.memory import MemoryScope
+    from s17code.core.memory.embeddings import DeterministicEmbedder
 
     captured: set[str] = set()
 
@@ -135,6 +136,7 @@ def test_every_registered_capability_has_a_worker_and_every_worker_is_registered
         raise AssertionError("the probe must not reach a model")
 
     runtime = runtime_module.AgentRuntime()
+    runtime.memory.embedder = DeterministicEmbedder(128)
     runtime_module.LiveGraphExecutor = _Probe
     try:
         with pytest.raises(_Stop):
