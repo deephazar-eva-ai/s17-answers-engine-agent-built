@@ -21,7 +21,7 @@ import json
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, Response
 from pydantic import BaseModel, Field
 
 from .agui import run_data_model, state_snapshot, to_agui_event
@@ -29,6 +29,8 @@ from .catalog import catalog_manifest
 from .hitl import PendingAction, decide_resume
 from .surface import build_run_surface
 from .validator import validate_surface
+from .export import build_docx, build_pptx
+from .export import slug as _slug_question
 
 router = APIRouter()
 _CLIENT = Path(__file__).parent / "client" / "index.html"
@@ -243,3 +245,51 @@ async def app_viewer():
     if not path.exists():
         raise HTTPException(500, "app viewer missing")
     return path.read_text()
+
+
+@router.get("/answers", response_class=HTMLResponse)
+@router.get("/answers/", response_class=HTMLResponse)
+async def answers_engine():
+    path = Path(__file__).parent / "client" / "answers.html"
+    if not path.exists():
+        raise HTTPException(500, "answers engine missing")
+    return path.read_text()
+
+
+class ExportBody(BaseModel):
+    question: str = Field(min_length=1, max_length=4_000)
+    answer: str = Field(min_length=1, max_length=40_000)
+    sources: list[list[str]] = Field(default_factory=list, max_length=200)
+
+
+def _export_filename(question: str, ext: str) -> str:
+    return f"{_slug_question(question)}.{ext}"
+
+
+@router.post("/v1/export/docx")
+async def export_docx(body: ExportBody):
+    """Render an already-shown answer as a DOCX. Pure text transform of
+    client-supplied, already-grounded content -- no LLM call, no run state
+    touched."""
+    pairs = [(s[0], s[1] if len(s) > 1 else s[0]) for s in body.sources if s]
+    data = build_docx(body.question, body.answer, pairs)
+    filename = _export_filename(body.question, "docx")
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.post("/v1/export/pptx")
+async def export_pptx(body: ExportBody):
+    """Render an already-shown answer as a PPTX. Same no-side-effect transform
+    as /v1/export/docx."""
+    pairs = [(s[0], s[1] if len(s) > 1 else s[0]) for s in body.sources if s]
+    data = build_pptx(body.question, body.answer, pairs)
+    filename = _export_filename(body.question, "pptx")
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

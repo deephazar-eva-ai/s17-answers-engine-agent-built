@@ -4,7 +4,10 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import asyncio
+import logging
 import os
+import uuid
 from datetime import UTC, datetime
 from typing import Any
 
@@ -16,6 +19,8 @@ from s17code.core.memory import MemoryKind, MemoryScope, Principal
 from s17code.telemetry import export_run
 
 router = APIRouter(prefix="/v1/agent", tags=["live agent"])
+
+log = logging.getLogger(__name__)
 
 
 async def gateway_text_llm(app, prompt: str, system: str):
@@ -197,6 +202,36 @@ async def run(body: RunBody, request: Request):
         raise HTTPException(422, str(error)) from error
     except RuntimeError as error:
         raise HTTPException(503, str(error)) from error
+
+
+@router.post("/runs/async", dependencies=[Depends(require_control)])
+async def run_async(body: RunBody, request: Request):
+    run_id = f"run-{uuid.uuid4().hex[:12]}"
+
+    async def _execute() -> None:
+        try:
+            await request.app.state.runtime.run(
+                prompt=body.prompt,
+                scope=body.scope(run_id=run_id),
+                llm=lambda prompt, system: gateway_text_llm(request.app, prompt, system),
+                source_uri="/v1/agent/runs/async",
+                source_author="user",
+                respond_as=body.respond_as,
+                budget=body.budget,
+                principal=body.principal,
+                allowed_side_effects=body.allowed_side_effects,
+                transport=request.app.state.gateway,
+                run_id=run_id,
+            )
+        except Exception:
+            log.exception(f"Background run {run_id} failed")
+        finally:
+            request.app.state.background_runs.pop(run_id, None)
+
+    task = asyncio.create_task(_execute())
+    request.app.state.background_runs[run_id] = task
+    await asyncio.sleep(0)
+    return {"run_id": run_id, "status": "started"}
 
 
 @router.post("/channel-messages")

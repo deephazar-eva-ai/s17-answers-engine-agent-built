@@ -37,7 +37,9 @@ def glob_files(workspace: Workspace, pattern: str, *, limit: int = 200) -> dict:
     hits = []
     for path, relative in _walk(workspace):
         rel = relative.replace(os.sep, "/")
-        if fnmatch.fnmatch(rel, pattern) or fnmatch.fnmatch(rel.rsplit("/", 1)[-1], pattern):
+        root_pattern = pattern[3:] if pattern.startswith("**/") else None
+        if (fnmatch.fnmatch(rel, pattern) or fnmatch.fnmatch(rel.rsplit("/", 1)[-1], pattern)
+                or (root_pattern and fnmatch.fnmatch(rel, root_pattern))):
             hits.append((path.stat().st_mtime, rel))
     hits.sort(reverse=True)
     files = [rel for _mtime, rel in hits[:limit]]

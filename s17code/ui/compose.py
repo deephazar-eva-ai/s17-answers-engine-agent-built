@@ -46,6 +46,22 @@ def _parse_json_object(text: str) -> dict[str, Any] | None:
 def _extract_surface(text: str) -> dict[str, Any] | None:
     return _parse_json_object(text)
 
+
+def _surface_text_summary(components: list[dict[str, Any]]) -> str:
+    """Every textual value a compose_surface LLM actually authored (Text.text,
+    Card.title, ...), joined flat -- the closest a UI component tree has to
+    prose, used only when this result must become evidence text rather than
+    be rendered (see EvidenceProjection in capabilities.py)."""
+    parts: list[str] = []
+    for comp in components or []:
+        if not isinstance(comp, dict):
+            continue
+        for key in ("title", "text", "summary"):
+            value = comp.get(key)
+            if isinstance(value, str) and value.strip():
+                parts.append(value.strip())
+    return "\n".join(parts)
+
 def _clean_key(text: str) -> str:
     return _slug(text)
 
@@ -335,5 +351,6 @@ async def compose_surface(ctx: RunContext, task: TaskSpec, *, surface_llm: Any) 
                       "dangling_child_refs": dangling, "component_types": types_used,
                       "component_count": len(validation.accepted)},
         "upstream_used": [item["label"] for item in outcomes],
+        "text_summary": _surface_text_summary(validation.accepted),
         "parse_ok": surface is not None,
     }

@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Answers Engine</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Palatino:wght@400;700&display=swap">
+<style>
+  :root{--bg:#F7F8FA;--surface:#FFF;--surface-alt:#FAFAFA;--ink:#111;--ink-body:#1A1A1A;--ink-muted:#5B5F66;--rule:#E8E8E8;--rule-strong:#D0D0D0;--green:#16A34A;--green-ink:#15803D;--accent:#2563EB;--accent-soft:rgba(37,99,235,.08);--accent-ink:#1D4ED8;--amber:#D97706;--amber-soft:rgba(217,119,6,.14);--amber-ink:#B45309;--red:#DC2626;--red-soft:rgba(220,38,38,.10);--red-ink:#B91C1C;--font-sans:'Inter',system-ui,sans-serif;--font-serif:'Palatino Linotype',Palatino,Georgia,serif;--font-mono:'JetBrains Mono',ui-monospace,Menlo,monospace;}
+  body{margin:0;background:var(--bg);color:var(--ink-body);font-family:var(--font-sans);font-size:15px;line-height:1.5;padding:26px 20px 70px}
+  header{display:flex;align-items:flex-start;gap:14px;margin-bottom:18px}
+  .brand{flex:1}
+  .eyebrow{font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-muted);font-weight:600}
+  h1{font-family:var(--font-serif);font-size:25px;margin:2px 0 0;color:var(--ink);font-weight:700}
+  .sub{font-family:var(--font-serif);font-style:italic;color:var(--ink-muted);margin:3px 0 0;font-size:14px}
+  .wrap{max-width:760px;margin:0 auto}
+  .startbar{display:flex;gap:8px;margin-bottom:10px}
+  input{flex:1;padding:13px 15px;border:1px solid var(--rule-strong);border-radius:12px;font-size:15px;font-family:var(--font-sans)}
+  input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  button{padding:0 20px;height:44px;border:none;border-radius:12px;background:var(--ink);color:#fff;font-weight:600;font-size:14px;cursor:pointer}
+  button:hover{opacity:.9}
+  .screen{margin-top:10px}
+  .reasoning{font-family:var(--font-mono);font-size:12px;color:var(--ink-muted);display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+  .refusal{background:var(--amber-soft);border:1px solid var(--amber);padding:14px 16px;border-radius:10px;color:var(--amber-ink)}
+  .error{color:var(--red-ink);background:var(--red-soft);padding:9px 12px;border-radius:8px;margin:4px 0;font-size:12px}
+  .turn{background:var(--surface);border:1px solid var(--rule);border-radius:14px;padding:18px;margin-top:16px;box-shadow:0 4px 16px -8px rgba(0,20,60,.08)}
+  .turn-q{font-weight:700;font-size:15px;color:var(--ink);margin-bottom:10px;font-family:var(--font-serif)}
+  .turn .screen p{margin:8px 0;line-height:1.7;color:var(--ink-body)}
+  .turn .screen b{color:var(--ink)}
+  .turn .screen ol{margin:14px 0 0;padding-left:20px}
+  .turn .screen ol a{color:var(--accent-ink);font-weight:600;text-decoration:none}
+  .turn .screen ol a:hover{text-decoration:underline}
+  .chip{border:1px solid var(--rule-strong);background:var(--surface);color:var(--ink-muted);border-radius:999px;padding:7px 14px;font-size:12.5px;cursor:pointer;margin:4px 6px 0 0;display:inline-block;font-family:var(--font-sans)}
+  .chip:hover{border-color:var(--accent);color:var(--accent-ink)}
+  .chips-label{font-family:var(--font-mono);font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-muted);margin-top:14px;margin-bottom:2px}
+  .convobar{display:flex;align-items:center;justify-content:space-between;gap:10px;font-family:var(--font-mono);font-size:12px;color:var(--accent-ink);background:var(--accent-soft);border-radius:999px;padding:6px 8px 6px 13px;margin-bottom:14px}
+  .convobar button{height:auto;padding:5px 12px;font-size:11px;border-radius:999px;background:var(--surface);color:var(--accent-ink);border:1px solid var(--accent)}
+.history{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+  .histitem{background:var(--surface);border:1px solid var(--rule);border-radius:12px;overflow:hidden}
+  .histq{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer}
+  .histq:hover{background:var(--surface-alt)}
+  .histq .chev{font-family:var(--font-mono);color:var(--ink-muted);font-size:11px;flex:none;transition:transform 150ms}
+  .histitem.open .histq .chev{transform:rotate(90deg)}
+  .histq .qtext{flex:1;font-weight:600;font-size:13.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .histbody{display:none;padding:0 14px 14px}
+  .histitem.open .histbody{display:block;padding-top:12px;border-top:1px solid var(--rule)}
+  .step{display:flex;gap:9px;align-items:flex-start;padding:5px 2px}
+  .stepdot{width:9px;height:9px;border-radius:50%;background:var(--rule-strong);flex:none;margin-top:5px}
+  .step.running .stepdot{background:var(--accent)}
+  .step.ok .stepdot{background:var(--green)}
+  .step.fail .stepdot{background:var(--red)}
+  .step.fail{color:var(--red-ink)}
+.exportbar{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid var(--rule)}
+  .expbtn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--rule-strong);background:var(--surface);color:var(--ink);font-family:var(--font-mono);font-size:12px;font-weight:600;padding:8px 13px;border-radius:9px;cursor:pointer}
+  .expbtn:hover{border-color:var(--accent);color:var(--accent-ink)}
+  .expbtn:disabled{opacity:.5;cursor:default}
+.run-meta{margin-top:14px;padding-top:12px;border-top:1px solid var(--rule);font-family:var(--font-mono);font-size:11px;color:var(--ink-muted)}
+  .run-meta a{color:var(--ink-muted);margin:0 4px}
+  .run-meta a:hover{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="eyebrow">S17Code &middot; answer engine</div>
+      <h1>Answers</h1>
+      <p class="sub">Watch it search, watch it read, watch it refuse to guess when the evidence isn't there.</p>
+    </div>
+  </header>
+  <div class="startbar">
+    <input id="prompt" placeholder="Ask anything...">
+    <button id="ask">Ask</button>
+  </div>
+  <div class="startbar" style="margin-top:-10px">
+    <input id="token" type="password" placeholder="S17_CONTROL_TOKEN (kept only in this browser)" style="font-family:var(--font-mono);font-size:12px">
+  </div>
+  <div class="convobar" id="convobar">
+    <span id="convo-status">Starting a new conversation — no prior exchanges remembered yet.</span>
+    <button id="new-convo" type="button">New conversation</button>
+  </div>
+  <div id="history"></div>
+  <div class="turn" id="current-turn" style="display:none">
+    <div class="turn-q" id="current-q"></div>
+    <div class="reasoning" id="current-reasoning"></div>
+    <div class="screen" id="current-answer" style="display:none"></div>
+    <div class="run-meta" id="current-meta"></div>
+  </div>
+  <button id="toggle-raw" style="margin-top:20px">Toggle Raw JSON</button>
+  <pre id="raw-json" style="display:none;font-size:10px;overflow:auto"></pre>
+</div>
+<script>
+  function mdInline(text, parent) {
+    const parts = text.split(/(\*\*.*?\*\*|\*.*?\*)/g);
+    parts.forEach(part => {
+      if (part.startsWith('**')) {
+        const b = document.createElement('b');
+        b.textContent = part.slice(2, -2);
+        parent.appendChild(b);
+      } else if (part.startsWith('*')) {
+        const i = document.createElement('i');
+        i.textContent = part.slice(1, -1);
+        parent.appendChild(i);
+      } else {
+        parent.appendChild(document.createTextNode(part));
+      }
+    });
+  }
+  function md(text) {
+    const div = document.createElement('div');
+    text.split('\n').forEach(line => {
+      const p = document.createElement('p');
+      mdInline(line, p);
+      div.appendChild(p);
+    });
+    return div;
+  }
+  const allEvents = [];
+  const tokenInput = document.getElementById('token');
+  try { tokenInput.value = localStorage.getItem('s17_control_token') || ''; } catch(e) {}
+  tokenInput.addEventListener('change', () => { try { localStorage.setItem('s17_control_token', tokenInput.value); } catch(e) {} });
+  let convo = [];
+  function collectSources(sources, seen, value) {
+    for (const arr of [value?.hits, value?.pages]) {
+      if (!Array.isArray(arr)) continue;
+      for (const item of arr) {
+        const url = item && item.url;
+        if (url && !seen.has(url)) { seen.add(url); sources.push(url); }
+      }
+    }
+  }
+  function renderSources(container, sources) {
+    if (!sources.length) return;
+    const h = document.createElement('div');
+    h.textContent = 'Sources';
+    h.style.cssText = 'font-weight:600;margin-top:16px';
+    container.appendChild(h);
+    const ol = document.createElement('ol');
+    sources.forEach(url => {
+      const li = document.createElement('li');
+      const a = document.createElement('a');
+      a.href = url; a.textContent = url; a.target = '_blank'; a.rel = 'noopener';
+      li.appendChild(a);
+      ol.appendChild(li);
+    });
+    container.appendChild(ol);
+  }
+  async function fetchFollowups(question, answerText, turnElement) {
+    try {
+      const prompt = 'Given the question "' + question + '" and this answer: "' + answerText + '", suggest exactly 3 short, specific follow-up questions someone might naturally ask next. Reply with just the 3 questions, one per line, no numbering, no extra commentary.';
+      const res = await fetch('/v1/agent/runs/async', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tokenInput.value},
+        body: JSON.stringify({tenant_id: 'answers-engine', project_id: 'p1', user_id: 'u1', agent_id: 'a2', prompt, respond_as: 'text'})
+      });
+      const body = await res.json();
+      const runId = body.run_id;
+      if (!runId) return;
+      const source = new EventSource('/v1/runs/' + runId + '/events');
+      let text = '';
+      await new Promise((resolve) => {
+        source.onmessage = (e) => {
+          const data = JSON.parse(e.data);
+          if (data.type === 'STEP_FINISHED' && data.delta?.value?.answer && !text) {
+            text = data.delta.value.answer;
+          }
+          if (data.type === 'RUN_FINISHED') {
+            source.close();
+            resolve();
+          }
+        };
+        source.onerror = () => { source.close(); resolve(); };
+      });
+      if (!text) return;
+      const lines = text.split('\n').map((l) => l.trim().replace(/^[-*]\s*/, '').replace(/^\d+[.)]\s*/, '')).filter((l) => l).slice(0, 3);
+      if (!lines.length) return;
+      const label = document.createElement('div');
+      label.className = 'chips-label';
+      label.textContent = 'Try asking:';
+      turnElement.appendChild(label);
+      lines.forEach((line) => {
+        const chip = document.createElement('button');
+        chip.className = 'chip';
+        chip.textContent = line;
+        chip.onclick = () => askQuestion(line);
+        turnElement.appendChild(chip);
+      });
+    } catch (e) { /* follow-up suggestions are a nice-to-have; fail silently */ }
+  }
+
+  async function downloadExport(kind, question, answerText, sources, opts) {
+    opts = opts || {};
+    const btn = opts.btn;
+    if (btn) { btn.disabled = true; btn.textContent = 'generating ' + kind + '\u2026'; }
+    try {
+      const pairs = sources.map((url) => [url]);
+      const res = await fetch('/v1/export/' + kind, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({question: question || 'answer', answer: answerText, sources: pairs}),
+      });
+      if (!res.ok) { return; }
+      const blob = await res.blob();
+      const cd = res.headers.get('content-disposition') || '';
+      const m = /filename="([^"]+)"/.exec(cd);
+      const filename = m ? m[1] : 'answer.' + kind;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.append(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = (kind === 'docx' ? '\u2B07 Export DOCX' : '\u2B07 Export PPTX'); }
+    }
+  }
+  function exportBar(question, answerText, sources) {
+    const bar = document.createElement('div');
+    bar.className = 'exportbar';
+    const docxBtn = document.createElement('button');
+    docxBtn.className = 'expbtn'; docxBtn.textContent = '\u2B07 Export DOCX';
+    docxBtn.onclick = () => downloadExport('docx', question, answerText, sources, {btn: docxBtn});
+    const pptxBtn = document.createElement('button');
+    pptxBtn.className = 'expbtn'; pptxBtn.textContent = '\u2B07 Export PPTX';
+    pptxBtn.onclick = () => downloadExport('pptx', question, answerText, sources, {btn: pptxBtn});
+    bar.append(docxBtn, pptxBtn);
+    return bar;
+  }
+  function addHistoryItem(entry) {
+    const history = document.getElementById('history');
+    const item = document.createElement('div');
+    item.className = 'histitem';
+    const qrow = document.createElement('div');
+    qrow.className = 'histq';
+    const chev = document.createElement('span');
+    chev.className = 'chev';
+    chev.textContent = '\u203a';
+    const qtext = document.createElement('span');
+    qtext.className = 'qtext';
+    qtext.textContent = entry.question;
+    qrow.append(chev, qtext);
+    qrow.onclick = () => item.classList.toggle('open');
+    const body = document.createElement('div');
+    body.className = 'histbody';
+    body.appendChild(md(entry.answerText));
+    if (entry.sources && entry.sources.length) { renderSources(body, entry.sources); }
+    body.appendChild(exportBar(entry.question, entry.answerText, entry.sources || []));
+    item.append(qrow, body);
+    history.appendChild(item);
+  }
+  function updateConvoStatus() {
+    const el = document.getElementById('convo-status');
+    el.textContent = convo.length
+      ? 'Remembering ' + convo.length + ' previous exchange' + (convo.length === 1 ? '' : 's') + ' as context.'
+      : 'Starting a new conversation \u2014 no prior exchanges remembered yet.';
+  }
+  document.getElementById('toggle-raw').onclick = () => { const el = document.getElementById('raw-json'); el.style.display = el.style.display === 'none' ? 'block' : 'none'; };
+  async function askQuestion(text) {
+    if (convo.length) { addHistoryItem(convo[convo.length - 1]); }
+    const q = document.getElementById('current-q');
+    const reasoning = document.getElementById('current-reasoning');
+    const answer = document.getElementById('current-answer');
+    const stepEls = new Map();
+    document.getElementById('current-turn').style.display = 'block';
+    q.textContent = text;
+    reasoning.replaceChildren();
+    answer.replaceChildren();
+    document.getElementById('current-meta').replaceChildren();
+    answer.className = 'screen';
+    answer.style.display = 'none';
+    let prompt = text;
+    if (convo.length) {
+      let ctx = 'Original question: ' + convo[0].question + '\n\nConversation so far:\n';
+      ctx += convo.map(t => 'Q: ' + t.question + '\nA: ' + t.answerText).join('\n\n');
+      ctx += '\n\nNew follow-up question: ' + text + '\nAnswer the follow-up question, using the conversation so far as context.';
+      prompt = ctx;
+    }
+    const res = await fetch('/v1/agent/runs/async', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + tokenInput.value},
+      body: JSON.stringify({tenant_id: 'answers-engine', project_id: 'p1', user_id: 'u1', agent_id: 'a1', prompt, respond_as: 'text'})
+    });
+    const body = await res.json();
+    const runId = body.run_id;
+    if (!runId) {
+      answer.style.display = 'block';
+      answer.className = 'screen refusal';
+      answer.textContent = 'Could not start run (check the control token).';
+      return;
+    }
+    const meta = document.getElementById('current-meta');
+    meta.append(document.createTextNode('run '));
+    const code = document.createElement('code');
+    code.textContent = runId;
+    meta.append(code, document.createTextNode(' \u00b7 '));
+    const snapLink = document.createElement('a');
+    snapLink.href = '/v1/runs/' + runId + '/snapshot';
+    snapLink.target = '_blank';
+    snapLink.textContent = 'snapshot';
+    meta.append(snapLink, document.createTextNode(' \u00b7 '));
+    const consoleLink = document.createElement('a');
+    consoleLink.href = '/console';
+    consoleLink.target = '_blank';
+    consoleLink.textContent = 'operator console';
+    meta.append(consoleLink);
+    let answerShown = false;
+    let answerText = '';
+    const sources = [];
+    const seenUrls = new Set();
+    const source = new EventSource('/v1/runs/' + runId + '/events');
+    await new Promise((resolve) => {
+      source.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+        allEvents.push(data);
+        document.getElementById('raw-json').textContent = JSON.stringify(allEvents, null, 2);
+        if (data.type === 'STEP_STARTED') {
+          const step = document.createElement('div');
+          step.className = 'step running';
+          const dot = document.createElement('span');
+          dot.className = 'stepdot';
+          const label = document.createElement('span');
+          label.textContent = data.stepName;
+          step.append(dot, label);
+          reasoning.appendChild(step);
+          stepEls.set(data.stepName, step);
+        }
+        if (data.type === 'STEP_FINISHED') {
+          const finishedStep = stepEls.get(data.stepName);
+          if (finishedStep) { finishedStep.className = data.error ? 'step fail' : 'step ok'; }
+          if (data.delta?.value?.answer && !answerShown) {
+            answerShown = true;
+            answerText = data.delta.value.answer;
+            answer.style.display = 'block';
+            answer.appendChild(md(answerText));
+          }
+          if (data.delta?.value) { collectSources(sources, seenUrls, data.delta.value); }
+          if (data.error) {
+            const err = document.createElement('div');
+            err.className = 'error';
+            err.textContent = data.error;
+            reasoning.appendChild(err);
+          }
+        }
+        if (data.type === 'RUN_FINISHED') {
+          source.close();
+          renderSources(answer, sources);
+          if (answerShown) { answer.appendChild(exportBar(text, answerText, sources)); }
+          if (!answerShown) {
+            answer.style.display = 'block';
+            answer.className = 'screen refusal';
+            answer.textContent = 'No grounded answer found for this request.';
+          }
+          resolve();
+        }
+      };
+    });
+    if (answerShown) {
+      convo.push({question: text, answerText: answerText, sources: sources.slice()});
+      updateConvoStatus();
+      fetchFollowups(text, answerText, answer);
+    }
+  }
+  document.getElementById('ask').onclick = () => { const v = document.getElementById('prompt').value; if (v.trim()) askQuestion(v.trim()); };
+  document.getElementById('new-convo').onclick = () => {
+    convo = [];
+    document.getElementById('history').replaceChildren();
+    document.getElementById('current-turn').style.display = 'none';
+    document.getElementById('current-reasoning').replaceChildren();
+    const currentAnswer = document.getElementById('current-answer');
+    currentAnswer.replaceChildren();
+    currentAnswer.className = 'screen';
+    currentAnswer.style.display = 'none';
+    document.getElementById('prompt').value = '';
+    updateConvoStatus();
+  };
+</script>
+</body>
+</html>

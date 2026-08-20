@@ -45,6 +45,7 @@ async def lifespan(app: FastAPI):
     app.state.runtime = AgentRuntime()
     data_dir = app.state.runtime.root
     app.state.event_store = EventStore(data_dir / "events")
+    app.state.background_runs = {}  # run_id -> asyncio.Task, holds a strong ref so background work isn't GC'd mid-flight
     app.state.event_engine = AutonomousEventEngine(app.state.event_store, app.state.runtime)
     bearers, api_keys = _secrets("S17_A2A_BEARER_TOKENS"), _secrets("S17_A2A_API_KEYS")
     base_url = os.getenv("S17_BASE_URL", f"http://127.0.0.1:{PORT}").rstrip("/")

@@ -477,7 +477,8 @@ def default_registry() -> CapabilityRegistry:
                    families=("synthesis",)),
         Capability("compose_surface", "Compose and validate an A2UI surface from completed upstream outcomes.",
                    {"query": string("Interface goal and important presentation constraints.", maximum=20_000)},
-                   role="ui_composer", terminal_for=("ui",)),
+                   role="ui_composer", terminal_for=("ui",),
+                   evidence=EvidenceProjection(kind="ui_composition", text="text_summary")),
         # ---- the coding surface (Session 17) --------------------------------
         # These are the first capabilities whose output is executed rather than
         # read. Every bound they need is declared here or enforced in

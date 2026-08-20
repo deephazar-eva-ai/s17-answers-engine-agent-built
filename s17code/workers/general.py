@@ -198,14 +198,18 @@ async def load_skill(ctx: RunContext, task: TaskSpec) -> dict[str, Any]:
         raise RuntimeError("no skills are configured; set S17_SKILLS_DIR")
     name = str(task.input["name"]).strip()
     reference = (task.input.get("reference") or "").strip()
-    if reference:
-        return {"skill": name, "reference": reference,
-                "instructions": manager.reference(name, reference)}
     skill = manager.get(name)
     if skill is None or not skill.enabled:
         available = [row["name"] for row in manager.listing()]
         raise RuntimeError(f"no enabled skill called {name!r}; available: {available}")
     refs = manager.references(name)
+    if reference:
+        if reference not in refs:
+            return {"skill": name, "reference": reference,
+                    "error": f"{reference!r} is not one of this skill's reference files: {refs}",
+                    "description": skill.description, "instructions": skill.instructions}
+        return {"skill": name, "reference": reference,
+                "instructions": manager.reference(name, reference)}
     return {"skill": name, "description": skill.description,
             "instructions": skill.instructions,
             "references": refs,
